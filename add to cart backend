@@ -1,0 +1,57 @@
+const express = require('express');
+const mongoose = require('mongoose');
+const session = require('express-session');
+
+const app = express();
+const PORT = 3000;
+
+// Middleware
+app.use(express.json());
+app.use(session({
+    secret: 'flashTabSecret',
+    resave: false,
+    saveUninitialized: true
+}));
+
+// MongoDB Connection
+mongoose.connect('mongodb://localhost:27017/flashtab', {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+});
+
+// Product Schema
+const productSchema = new mongoose.Schema({
+    name: String,
+    price: Number,
+    image: String
+});
+
+const Product = mongoose.model('Product', productSchema);
+
+// Add to Cart API
+app.post('/cart/add', async (req, res) => {
+    const { productId } = req.body;
+    const product = await Product.findById(productId);
+    
+    if (!product) return res.status(404).json({ message: 'Product not found' });
+    
+    if (!req.session.cart) req.session.cart = [];
+    req.session.cart.push(product);
+    res.json({ message: 'Product added to cart', cart: req.session.cart });
+});
+
+// Remove from Cart API
+app.post('/cart/remove', (req, res) => {
+    const { productId } = req.body;
+    if (!req.session.cart) return res.status(400).json({ message: 'Cart is empty' });
+    
+    req.session.cart = req.session.cart.filter(item => item._id !== productId);
+    res.json({ message: 'Product removed', cart: req.session.cart });
+});
+
+// View Cart API
+app.get('/cart', (req, res) => {
+    res.json({ cart: req.session.cart || [] });
+});
+
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
